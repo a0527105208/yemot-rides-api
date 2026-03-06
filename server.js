@@ -1,8 +1,10 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const app = express();
-const port = port = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
+// הכתובת המלאה של השרת שלך ב-Render - חיוני לניתוב תקין
+const BASE_URL = "https://yemot-rides.onrender.com/ivr-api";
 const mongoURI = process.env.MONGO_URI;
 
 mongoose.connect(mongoURI)
@@ -48,7 +50,7 @@ app.get('/ivr-api', async (req, res) => {
         
         if (action === 'reg') {
             await User.updateOne({ phone: ApiPhone }, { name_recorded: true });
-            return res.send(`id_list_message=t-נשמר&next=ivr-api?action=main`);
+            return res.send(`say=t-נשמר&go_to=${BASE_URL}?action=main`);
         }
 
         // Main Menu
@@ -57,10 +59,10 @@ app.get('/ivr-api', async (req, res) => {
         }
 
         if (action === 'h_main') {
-            if (ApiDigits === '1') return res.send(`next=ivr-api?action=d_menu`);
-            if (ApiDigits === '2') return res.send(`next=ivr-api?action=p_menu`);
-            if (ApiDigits === '3') return res.send(`next=ivr-api?action=del`);
-            return res.send(`next=ivr-api?action=main`);
+            if (ApiDigits === '1') return res.send(`go_to=${BASE_URL}?action=d_menu`);
+            if (ApiDigits === '2') return res.send(`go_to=${BASE_URL}?action=p_menu`);
+            if (ApiDigits === '3') return res.send(`go_to=${BASE_URL}?action=del`);
+            return res.send(`go_to=${BASE_URL}?action=main`);
         }
 
         // Driver Menu
@@ -68,9 +70,9 @@ app.get('/ivr-api', async (req, res) => {
             return res.send(`read=t-לפרסום נסיעה הקישו 1 לשמיעת בקשות הקישו 2=digits,1,1,1,7,yes,no&action=h_d_act`);
         }
         if (action === 'h_d_act') {
-            if (ApiDigits === '1') return res.send(`next=ivr-api?action=sel_d&t=driver`);
-            if (ApiDigits === '2') return res.send(`next=ivr-api?action=list&list_t=passenger`);
-            return res.send(`next=ivr-api?action=main`);
+            if (ApiDigits === '1') return res.send(`go_to=${BASE_URL}?action=sel_d&t=driver`);
+            if (ApiDigits === '2') return res.send(`go_to=${BASE_URL}?action=list&list_t=passenger`);
+            return res.send(`go_to=${BASE_URL}?action=main`);
         }
 
         // Passenger Menu
@@ -78,9 +80,9 @@ app.get('/ivr-api', async (req, res) => {
             return res.send(`read=t-לבקשת נסיעה הקישו 1 לשמיעת נהגים הקישו 2=digits,1,1,1,7,yes,no&action=h_p_act`);
         }
         if (action === 'h_p_act') {
-            if (ApiDigits === '1') return res.send(`next=ivr-api?action=sel_d&t=passenger`);
-            if (ApiDigits === '2') return res.send(`next=ivr-api?action=list&list_t=driver`);
-            return res.send(`next=ivr-api?action=main`);
+            if (ApiDigits === '1') return res.send(`go_to=${BASE_URL}?action=sel_d&t=passenger`);
+            if (ApiDigits === '2') return res.send(`go_to=${BASE_URL}?action=list&list_t=driver`);
+            return res.send(`go_to=${BASE_URL}?action=main`);
         }
 
         // Direction Selection
@@ -111,7 +113,7 @@ app.get('/ivr-api', async (req, res) => {
                 const noteName = `n_${Date.now()}`;
                 return res.send(`read=t-הקליטו הערה וסיימו בסולמית=record_name,no,1,1,7,yes,no&action=fin&t=${t}&d=${d}&tm=${tm || ''}&s=${s || ''}&n_id=${noteName}`);
             }
-            return res.send(`next=ivr-api?action=fin&t=${t}&d=${d}&tm=${tm || ''}&s=${s || ''}`);
+            return res.send(`go_to=${BASE_URL}?action=fin&t=${t}&d=${d}&tm=${tm || ''}&s=${s || ''}`);
         }
 
         // Finalize
@@ -124,14 +126,14 @@ app.get('/ivr-api', async (req, res) => {
                 seats: s,
                 note_id: req.query.n_id
             });
-            return res.send(`id_list_message=t-נשמר בהצלחה&next=ivr-api?action=main`);
+            return res.send(`say=t-נשמר בהצלחה&go_to=${BASE_URL}?action=main`);
         }
 
         // Listing
         if (action === 'list') {
             const listT = req.query.list_t;
             const items = await Ride.find({ type: listT }).sort({ createdAt: -1 });
-            if (items.length === 0) return res.send(`id_list_message=t-אין פרסומים&next=ivr-api?action=main`);
+            if (items.length === 0) return res.send(`say=t-אין פרסומים&go_to=${BASE_URL}?action=main`);
             
             const item = items[0]; 
             const dirTxt = item.direction === '1' ? 'מאשדוד לבני ברק' : 'מבני ברק לאשדוד';
@@ -152,24 +154,24 @@ app.get('/ivr-api', async (req, res) => {
                 const item = await Ride.findById(r_id);
                 if (item) return res.send(`api_link=dial&phone=${item.driver_phone}`);
             }
-            return res.send(`next=ivr-api?action=main`);
+            return res.send(`go_to=${BASE_URL}?action=main`);
         }
 
         // Delete
         if (action === 'del') {
             const count = await Ride.countDocuments({ driver_phone: ApiPhone });
-            if (count === 0) return res.send(`id_list_message=t-אין פרסומים&next=ivr-api?action=main`);
+            if (count === 0) return res.send(`say=t-אין פרסומים&go_to=${BASE_URL}?action=main`);
             return res.send(`read=t-למחיקת ${count} פרסומים הקישו 7=digits,1,1,1,7,yes,no&action=h_del`);
         }
         if (action === 'h_del' && ApiDigits === '7') {
             await Ride.deleteMany({ driver_phone: ApiPhone });
-            return res.send(`id_list_message=t-נמחק&next=ivr-api?action=main`);
+            return res.send(`say=t-נמחק&go_to=${BASE_URL}?action=main`);
         }
-        if (action === 'h_del') return res.send(`next=ivr-api?action=main`);
+        if (action === 'h_del') return res.send(`go_to=${BASE_URL}?action=main`);
 
     } catch (error) {
         console.error("Error:", error);
-        res.send(`id_list_message=t-תקלה&next=exit`);
+        res.send(`say=t-תקלה&goto_all_endpoints=exit`);
     }
 });
 
