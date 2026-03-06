@@ -43,43 +43,47 @@ app.get('/ivr-api', async (req, res) => {
         if (!user.name_recorded && action !== 'after_record') {
             return res.send(`read=t-שלום, אינך רשום במערכת. אנא הקליטו את שמכם המלא לאחר הצליל וסיימו בסולמית=record_name,no,1,1,7,yes,no&action=after_record`);
         }
+        
         if (action === 'after_record') {
             await User.updateOne({ phone: ApiPhone }, { name_recorded: true });
-            return res.send(`id_list_message=t-השם נשמר בהצלחה.&routing=main_menu`);
+            return res.send(`id_list_message=t-השם נשמר בהצלחה.&go_to=ivr-api?action=main_menu`);
         }
 
         // תפריט ראשי
-        if (ApiControl === 'main_menu' || !action) {
+        if (action === 'main_menu' || !action) {
             return res.send(`read=t-לנהגים הקישו 1, לנוסעים הקישו 2, למחיקת הפרסומים שלי הקישו 3=digits,1,1,1,7,yes,no&action=handle_main`);
         }
 
         // ניתוב תפריט ראשי
         if (action === 'handle_main') {
-            if (ApiDigits === '1') return res.send(`routing=driver_menu`);
-            if (ApiDigits === '2') return res.send(`routing=passenger_menu`);
-            if (ApiDigits === '3') return res.send(`routing=delete_menu`);
+            if (ApiDigits === '1') return res.send(`go_to=ivr-api?action=driver_menu`);
+            if (ApiDigits === '2') return res.send(`go_to=ivr-api?action=passenger_menu`);
+            if (ApiDigits === '3') return res.send(`go_to=ivr-api?action=delete_menu`);
+            return res.send(`go_to=ivr-api?action=main_menu`);
         }
 
         // תפריט נהגים
-        if (ApiControl === 'driver_menu') {
+        if (action === 'driver_menu') {
             return res.send(`read=t-לפרסום נסיעה הקישו 1, לשמיעת בקשות נסיעה הקישו 2=digits,1,1,1,7,yes,no&action=driver_action`);
         }
         if (action === 'driver_action') {
-            if (ApiDigits === '1') return res.send(`routing=select_direction&type=driver`);
-            if (ApiDigits === '2') return res.send(`routing=list_items&list_type=passenger`);
+            if (ApiDigits === '1') return res.send(`go_to=ivr-api?action=select_direction&type=driver`);
+            if (ApiDigits === '2') return res.send(`go_to=ivr-api?action=list_items&list_type=passenger`);
+            return res.send(`go_to=ivr-api?action=main_menu`);
         }
 
         // תפריט נוסעים
-        if (ApiControl === 'passenger_menu') {
+        if (action === 'passenger_menu') {
             return res.send(`read=t-לבקשת נסיעה הקישו 1, לשמיעת נהגים הקישו 2=digits,1,1,1,7,yes,no&action=passenger_action`);
         }
         if (action === 'passenger_action') {
-            if (ApiDigits === '1') return res.send(`routing=select_direction&type=passenger`);
-            if (ApiDigits === '2') return res.send(`routing=list_items&list_type=driver`);
+            if (ApiDigits === '1') return res.send(`go_to=ivr-api?action=select_direction&type=passenger`);
+            if (ApiDigits === '2') return res.send(`go_to=ivr-api?action=list_items&list_type=driver`);
+            return res.send(`go_to=ivr-api?action=main_menu`);
         }
 
         // בחירת כיוון (משותף)
-        if (ApiControl === 'select_direction') {
+        if (action === 'select_direction') {
             return res.send(`read=t-לבחירת כיוון: מאשדוד לבני ברק הקישו 1, מבני ברק לאשדוד הקישו 2=digits,1,1,1,7,yes,no&action=handle_direction&type=${type}`);
         }
         if (action === 'handle_direction') {
@@ -106,7 +110,7 @@ app.get('/ivr-api', async (req, res) => {
                 const noteName = `note_${Date.now()}_${ApiPhone}`;
                 return res.send(`read=t-אנא הקליטו את הערתכם לאחר הצליל וסיימו בסולמית=record_name,no,1,1,7,yes,no&action=finalize_post&type=${type}&direction=${direction}&time=${time || ''}&seats=${seats || ''}&note_id=${noteName}`);
             }
-            return res.send(`routing=finalize_post&type=${type}&direction=${direction}&time=${time || ''}&seats=${seats || ''}`);
+            return res.send(`go_to=ivr-api?action=finalize_post&type=${type}&direction=${direction}&time=${time || ''}&seats=${seats || ''}`);
         }
 
         // שמירה סופית
@@ -119,16 +123,16 @@ app.get('/ivr-api', async (req, res) => {
                 seats: seats,
                 note_id: req.query.note_id
             });
-            return res.send(`id_list_message=t-הפרסום נשמר בהצלחה.&routing=main_menu`);
+            return res.send(`id_list_message=t-הפרסום נשמר בהצלחה.&go_to=ivr-api?action=main_menu`);
         }
 
         // השמעת רשימות
-        if (ApiControl === 'list_items' || action === 'list_items') {
+        if (action === 'list_items') {
             const listType = req.query.list_type;
             const items = await Ride.find({ type: listType }).sort({ createdAt: -1 });
-            if (items.length === 0) return res.send(`id_list_message=t-אין פרסומים רלוונטיים כרגע.&routing=main_menu`);
+            if (items.length === 0) return res.send(`id_list_message=t-אין פרסומים רלוונטיים כרגע.&go_to=ivr-api?action=main_menu`);
             
-            const item = items[0]; // לצורך הפשטות משמיע את האחרון
+            const item = items[0]; 
             const dirText = item.direction === '1' ? 'מאשדוד לבני ברק' : 'מבני ברק לאשדוד';
             const roleText = item.type === 'driver' ? 'נהג' : 'נוסע';
             
@@ -147,18 +151,22 @@ app.get('/ivr-api', async (req, res) => {
                 const item = await Ride.findById(req.query.item_id);
                 if (item) return res.send(`api_link=dial&phone=${item.driver_phone}`);
             }
-            return res.send(`routing=main_menu`);
+            return res.send(`go_to=ivr-api?action=main_menu`);
         }
 
         // מחיקת הודעות שלי
-        if (ApiControl === 'delete_menu') {
+        if (action === 'delete_menu') {
             const count = await Ride.countDocuments({ driver_phone: ApiPhone });
-            if (count === 0) return res.send(`id_list_message=t-אין לך פרסומים פעילים.&routing=main_menu`);
+            if (count === 0) return res.send(`id_list_message=t-אין לך פרסומים פעילים.&go_to=ivr-api?action=main_menu`);
             return res.send(`read=t-יש לך ${count} פרסומים פעילים. למחיקת כולם הקישו 7, לביטול הקישו כל מקש אחר=digits,1,1,1,7,yes,no&action=handle_delete`);
         }
         if (action === 'handle_delete' && ApiDigits === '7') {
             await Ride.deleteMany({ driver_phone: ApiPhone });
-            return res.send(`id_list_message=t-כל הפרסומים שלך נמחקו.&routing=main_menu`);
+            return res.send(`id_list_message=t-כל הפרסומים שלך נמחקו.&go_to=ivr-api?action=main_menu`);
+        }
+        
+        if (action === 'handle_delete') {
+             return res.send(`go_to=ivr-api?action=main_menu`);
         }
 
     } catch (error) {
