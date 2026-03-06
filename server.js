@@ -60,7 +60,7 @@ app.get("/ivr-api", async (req, res) => {
             });
         }
 
-        // רישום משתמש - שימוש בפורמט record בתוך read למניעת באגים
+        // רישום משתמש
         if (!user.name_recorded && action !== "reg") {
             return res.send(
                 `read=t-שלום אינך רשום במערכת הקליטו את שמכם המלא לאחר הצליל וסיימו בסולמית` +
