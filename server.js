@@ -7,7 +7,7 @@ const port = process.env.PORT || 3000;
 // וודא שכתובת זו מעודכנת לכתובת ה-Render שלך
 const BASE_URL = "https://yemot-rides.onrender.com/ivr-api";
 
-// כתובת החיבור המעודכנת שסיפקת
+// כתובת החיבור ל-MongoDB
 const mongoURI = "mongodb+srv://a0527105208:723815924@lerner.nueskna.mongodb.net/?appName=LERNER";
 
 /* ---------------- MongoDB ---------------- */
@@ -42,24 +42,21 @@ const Ride = mongoose.model("Ride", rideSchema);
 /* ---------------- IVR API ---------------- */
 
 app.get("/ivr-api", async (req, res) => {
-    // הגדרת Header קריטי לימות המשיח
     res.set('Content-Type', 'text/plain; charset=utf-8');
 
     const ApiPhone = req.query.ApiPhone || req.query.phone;
     const ApiDigits = req.query.ApiDigits;
     const action = req.query.action;
     
-    // בדיקת בדיקה מהירה: אם המשתמש מקיש כוכבית (בימות המשיח זה מגיע כ-*)
+    // בדיקת חיבור מהירה (כוכבית)
     if (ApiDigits === "*" || ApiDigits === "s") {
-        return res.send("say=t-המערכת מחוברת לשרת בהצלחה&goto_all_endpoints=exit");
+        return res.send("say=t-חיבור השרת תקין&goto_all_endpoints=exit");
     }
 
     const { t, d, tm, s, r_id } = req.query;
 
-    console.log(`Log: action=${action}, phone=${ApiPhone}, digits=${ApiDigits}`);
-
     if (!ApiPhone || ApiPhone === "anonymous") {
-        return res.send("say=t-מספר חסוי. המערכת דורשת זיהוי טלפוני&goto_all_endpoints=exit");
+        return res.send("say=t-מספר חסוי המערכת דורשת זיהוי טלפוני&goto_all_endpoints=exit");
     }
 
     try {
@@ -71,25 +68,20 @@ app.get("/ivr-api", async (req, res) => {
         /* ---------- כניסה ראשונית ---------- */
         if (!action) {
             if (!user.name_recorded) {
-                // שלב הקלטת שם - הגדרת מינימום 1 ספרה (סולמית לסיום)
+                // שימוש בפורמט הקלטה נקי למניעת שגיאות "מינימום ספרות"
                 return res.send(
-                    `read=t-שלום הקליטו שם מלא ובסיום הקישו סולמית. לבדיקת חיבור הקישו כוכבית` +
-                    `=record,no,1,1,7,yes,no&action=reg`
+                    `say=t-שלום אינכם רשומים הקליטו שם מלא ובסיום הקישו סולמית&` +
+                    `record=action=reg,no,7,yes,no`
                 );
             } else {
-                // תפריט ראשי - הקשה של ספרה אחת בדיוק
                 return res.send(
-                    `read=t-שלום לנהג הקישו 1 לנוסע 2 למחיקה 3. לבדיקת חיבור הקישו כוכבית` +
-                    `=digits,1,1,1,7,yes,no&action=h_main`
+                    `read=t-שלום לנהג 1 לנוסע 2 למחיקה 3=digits,1,1,1,7,yes,no&action=h_main`
                 );
             }
         }
 
-        /* ---------- רישום ---------- */
+        /* ---------- רישום (אחרי הקלטה) ---------- */
         if (action === "reg") {
-            // אם המשתמש הקיש כוכבית במקום להקליט
-            if (ApiDigits === "*") return res.send("say=t-חיבור תקין&goto_all_endpoints=exit");
-            
             await User.updateOne({ phone: ApiPhone }, { name_recorded: true });
             return res.send(`say=t-נרשמתם בהצלחה&go_to=${BASE_URL}?action=main`);
         }
@@ -97,8 +89,7 @@ app.get("/ivr-api", async (req, res) => {
         /* ---------- תפריט ראשי ---------- */
         if (action === "main") {
             return res.send(
-                `read=t-לנהג הקישו 1 לנוסע 2 למחיקה 3` +
-                `=digits,1,1,1,7,yes,no&action=h_main`
+                `read=t-לנהג 1 לנוסע 2 למחיקה 3=digits,1,1,1,7,yes,no&action=h_main`
             );
         }
 
@@ -112,8 +103,7 @@ app.get("/ivr-api", async (req, res) => {
         /* ---------- תפריט נהג ---------- */
         if (action === "d_menu") {
             return res.send(
-                `read=t-לפרסום נסיעה 1 לשמיעת נוסעים 2` +
-                `=digits,1,1,1,7,yes,no&action=h_d`
+                `read=t-לפרסום נסיעה 1 לשמיעת נוסעים 2=digits,1,1,1,7,yes,no&action=h_d`
             );
         }
 
@@ -126,8 +116,7 @@ app.get("/ivr-api", async (req, res) => {
         /* ---------- תפריט נוסע ---------- */
         if (action === "p_menu") {
             return res.send(
-                `read=t-לבקשת נסיעה 1 לשמיעת נהגים 2` +
-                `=digits,1,1,1,7,yes,no&action=h_p`
+                `read=t-לבקשת נסיעה 1 לשמיעת נהגים 2=digits,1,1,1,7,yes,no&action=h_p`
             );
         }
 
@@ -140,16 +129,14 @@ app.get("/ivr-api", async (req, res) => {
         /* ---------- בחירת כיוון ---------- */
         if (action === "sel_dir") {
             return res.send(
-                `read=t-מאשדוד לבני ברק 1 מבני ברק לאשדוד 2` +
-                `=digits,1,1,1,7,yes,no&action=h_dir&t=${t}`
+                `read=t-מאשדוד לבני ברק 1 מבני ברק לאשדוד 2=digits,1,1,1,7,yes,no&action=h_dir&t=${t}`
             );
         }
 
         if (action === "h_dir") {
             if (t === "driver") {
                 return res.send(
-                    `read=t-הקישו שעת יציאה בארבע ספרות` +
-                    `=digits,4,4,4,7,yes,no&action=set_time&t=${t}&d=${ApiDigits}`
+                    `read=t-הקישו שעת יציאה בארבע ספרות=digits,4,4,4,7,yes,no&action=set_time&t=${t}&d=${ApiDigits}`
                 );
             }
             return res.send(`go_to=${BASE_URL}?action=finish&t=${t}&d=${ApiDigits}`);
@@ -157,8 +144,7 @@ app.get("/ivr-api", async (req, res) => {
 
         if (action === "set_time") {
             return res.send(
-                `read=t-מספר מקומות פנויים` +
-                `=digits,1,1,1,7,yes,no&action=finish&t=${t}&d=${d}&tm=${ApiDigits}`
+                `read=t-מספר מקומות פנויים=digits,1,1,1,7,yes,no&action=finish&t=${t}&d=${d}&tm=${ApiDigits}`
             );
         }
 
@@ -208,7 +194,7 @@ app.get("/ivr-api", async (req, res) => {
         if (action === "del") {
             const count = await Ride.countDocuments({ driver_phone: ApiPhone });
             if (count === 0) return res.send(`say=t-אין לכם פרסומים&go_to=${BASE_URL}?action=main`);
-            return res.send(`read=t-נמצאו ${count} פרסומים למחיקה הקישו 7 לביטול כל מקש=digits,1,1,1,7,yes,no&action=del_ok`);
+            return res.send(`read=t-נמצאו ${count} פרסומים למחיקה הקישו 7 לביטול=digits,1,1,1,7,yes,no&action=del_ok`);
         }
 
         if (action === "del_ok" && ApiDigits === "7") {
