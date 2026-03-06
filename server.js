@@ -33,9 +33,15 @@ const User = mongoose.model('User', userSchema);
 const Ride = mongoose.model('Ride', rideSchema);
 
 app.get('/ivr-api', async (req, res) => {
+    // לוג לבדיקה אם הקריאה הגיעה לשרת
+    console.log(`Incoming request: action=${req.query.action}, phone=${req.query.ApiPhone}, digits=${req.query.ApiDigits}`);
+
     const { ApiPhone, ApiDigits, action, r_id, t, d, tm, s } = req.query;
 
-    if (!ApiPhone) return res.send('hangup');
+    // אם אין מספר טלפון, נשמיע הודעה ונתנתק כדי שתדע שהפרמטר חסר
+    if (!ApiPhone) {
+        return res.send('say=t-שגיאה חסר מספר טלפון במערכת בדקו הגדרות שלוחה&goto_all_endpoints=exit');
+    }
 
     try {
         let user = await User.findOne({ phone: ApiPhone });
@@ -62,7 +68,8 @@ app.get('/ivr-api', async (req, res) => {
             if (ApiDigits === '1') return res.send(`go_to=${BASE_URL}?action=d_menu`);
             if (ApiDigits === '2') return res.send(`go_to=${BASE_URL}?action=p_menu`);
             if (ApiDigits === '3') return res.send(`go_to=${BASE_URL}?action=del`);
-            return res.send(`go_to=${BASE_URL}?action=main`);
+            // אם המקש לא מזוהה, נשמיע למשתמש
+            return res.send(`say=t-מקש לא חוקי&go_to=${BASE_URL}?action=main`);
         }
 
         // Driver Menu
@@ -167,12 +174,3 @@ app.get('/ivr-api', async (req, res) => {
             await Ride.deleteMany({ driver_phone: ApiPhone });
             return res.send(`say=t-נמחק&go_to=${BASE_URL}?action=main`);
         }
-        if (action === 'h_del') return res.send(`go_to=${BASE_URL}?action=main`);
-
-    } catch (error) {
-        console.error("Error:", error);
-        res.send(`say=t-תקלה&goto_all_endpoints=exit`);
-    }
-});
-
-app.listen(port, () => console.log(`Server running on port ${port}`));
