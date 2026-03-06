@@ -6,7 +6,9 @@ const port = process.env.PORT || 3000;
 
 // וודא שכתובת זו מעודכנת לכתובת ה-Render שלך
 const BASE_URL = "https://yemot-rides.onrender.com/ivr-api";
-const mongoURI = process.env.MONGO_URI;
+
+// כתובת החיבור המעודכנת שסיפקת
+const mongoURI = "mongodb+srv://a0527105208:723815924@lerner.nueskna.mongodb.net/?appName=LERNER";
 
 /* ---------------- MongoDB ---------------- */
 
@@ -14,7 +16,7 @@ mongoose.connect(mongoURI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 })
-.then(() => console.log("Mongo connected"))
+.then(() => console.log("Mongo connected successfully"))
 .catch(err => console.error("Mongo connection error:", err));
 
 /* ---------------- Models ---------------- */
@@ -40,13 +42,18 @@ const Ride = mongoose.model("Ride", rideSchema);
 /* ---------------- IVR API ---------------- */
 
 app.get("/ivr-api", async (req, res) => {
-    // הגדרת Header כדי למנוע בעיות קידוד
+    // הגדרת Header קריטי לימות המשיח
     res.set('Content-Type', 'text/plain; charset=utf-8');
 
     const ApiPhone = req.query.ApiPhone || req.query.phone;
     const ApiDigits = req.query.ApiDigits;
     const action = req.query.action;
     
+    // בדיקת בדיקה מהירה: אם המשתמש מקיש כוכבית בתפריט הראשוני
+    if (ApiDigits === "*") {
+        return res.send("say=t-המערכת מחוברת לשרת בהצלחה&goto_all_endpoints=exit");
+    }
+
     const { t, d, tm, s, r_id } = req.query;
 
     console.log(`Log: action=${action}, phone=${ApiPhone}, digits=${ApiDigits}`);
@@ -65,12 +72,12 @@ app.get("/ivr-api", async (req, res) => {
         if (!action) {
             if (!user.name_recorded) {
                 return res.send(
-                    `read=t-שלום הקליטו שם מלא בסיום סולמית` +
+                    `read=t-שלום הקליטו שם מלא בסיום סולמית. לבדיקת חיבור הקישו כוכבית` +
                     `=record,no,1,10,7,yes,no&action=reg`
                 );
             } else {
                 return res.send(
-                    `read=t-שלום לנהג הקישו 1 לנוסע 2 למחיקה 3` +
+                    `read=t-שלום לנהג הקישו 1 לנוסע 2 למחיקה 3. לבדיקת חיבור הקישו כוכבית` +
                     `=digits,1,1,1,7,yes,no&action=h_main`
                 );
             }
