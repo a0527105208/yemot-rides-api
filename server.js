@@ -49,14 +49,16 @@ app.get('/ivr-api', async (req, res) => {
             user = await User.create({ phone: ApiPhone, name_recorded: false });
         }
 
-        // Initial Registration
+        // שלב הקלטת שם - תיקון הפקודה
         if (!user.name_recorded && action !== 'reg') {
+            // בימות המשיח, בתוך שלוחת API, פקודת הקלטת שם צריכה להסתיים ולחזור לשרת
             return res.send(`read=t-שלום אינך רשום במערכת אנא הקליטו את שמכם המלא לאחר הצליל וסיימו בסולמית=record_name,no,1,1,7,yes,no&action=reg`);
         }
         
         if (action === 'reg') {
+            // אם המשתמש סיים להקליט (לחץ סולמית או עבר זמן), המערכת חוזרת לכאן
             await User.updateOne({ phone: ApiPhone }, { name_recorded: true });
-            return res.send(`say=t-נשמר&go_to=${BASE_URL}?action=main`);
+            return res.send(`say=t-השם נשמר בהצלחה&go_to=${BASE_URL}?action=main`);
         }
 
         // Main Menu
@@ -68,7 +70,6 @@ app.get('/ivr-api', async (req, res) => {
             if (ApiDigits === '1') return res.send(`go_to=${BASE_URL}?action=d_menu`);
             if (ApiDigits === '2') return res.send(`go_to=${BASE_URL}?action=p_menu`);
             if (ApiDigits === '3') return res.send(`go_to=${BASE_URL}?action=del`);
-            // אם המקש לא מזוהה, נשמיע למשתמש
             return res.send(`say=t-מקש לא חוקי&go_to=${BASE_URL}?action=main`);
         }
 
@@ -114,7 +115,7 @@ app.get('/ivr-api', async (req, res) => {
             return res.send(`read=t-להקלטת הערה הקישו 1 או סולמית=digits,1,1,1,7,yes,no&action=n_st&t=driver&d=${d}&tm=${tm}&s=${seatsVal}`);
         }
 
-        // Note Recording
+        // הקלטת הערה - תיקון דומה
         if (action === 'n_st') {
             if (ApiDigits === '1') {
                 const noteName = `n_${Date.now()}`;
@@ -174,3 +175,14 @@ app.get('/ivr-api', async (req, res) => {
             await Ride.deleteMany({ driver_phone: ApiPhone });
             return res.send(`say=t-נמחק&go_to=${BASE_URL}?action=main`);
         }
+        if (action === 'h_del') return res.send(`go_to=${BASE_URL}?action=main`);
+
+        return res.send(`say=t-שגיאה פעולה לא מוכרת ${action || 'ריק'}&go_to=${BASE_URL}?action=main`);
+
+    } catch (error) {
+        console.error("Critical Error:", error);
+        res.send(`say=t-תקלה בשרת הודעה ${error.message.replace(/[^א-תa-zA-Z0-9 ]/g, '')}&goto_all_endpoints=exit`);
+    }
+});
+
+app.listen(port, () => console.log(`Server running on port ${port}`));
