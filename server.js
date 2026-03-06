@@ -49,8 +49,8 @@ app.get("/ivr-api", async (req, res) => {
     const ApiDigits = req.query.ApiDigits;
     const action = req.query.action;
     
-    // בדיקת בדיקה מהירה: אם המשתמש מקיש כוכבית בתפריט הראשוני
-    if (ApiDigits === "*") {
+    // בדיקת בדיקה מהירה: אם המשתמש מקיש כוכבית (בימות המשיח זה מגיע כ-*)
+    if (ApiDigits === "*" || ApiDigits === "s") {
         return res.send("say=t-המערכת מחוברת לשרת בהצלחה&goto_all_endpoints=exit");
     }
 
@@ -71,11 +71,13 @@ app.get("/ivr-api", async (req, res) => {
         /* ---------- כניסה ראשונית ---------- */
         if (!action) {
             if (!user.name_recorded) {
+                // שלב הקלטת שם - הגדרת מינימום 1 ספרה (סולמית לסיום)
                 return res.send(
-                    `read=t-שלום הקליטו שם מלא בסיום סולמית. לבדיקת חיבור הקישו כוכבית` +
-                    `=record,no,1,10,7,yes,no&action=reg`
+                    `read=t-שלום הקליטו שם מלא ובסיום הקישו סולמית. לבדיקת חיבור הקישו כוכבית` +
+                    `=record,no,1,1,7,yes,no&action=reg`
                 );
             } else {
+                // תפריט ראשי - הקשה של ספרה אחת בדיוק
                 return res.send(
                     `read=t-שלום לנהג הקישו 1 לנוסע 2 למחיקה 3. לבדיקת חיבור הקישו כוכבית` +
                     `=digits,1,1,1,7,yes,no&action=h_main`
@@ -85,6 +87,9 @@ app.get("/ivr-api", async (req, res) => {
 
         /* ---------- רישום ---------- */
         if (action === "reg") {
+            // אם המשתמש הקיש כוכבית במקום להקליט
+            if (ApiDigits === "*") return res.send("say=t-חיבור תקין&goto_all_endpoints=exit");
+            
             await User.updateOne({ phone: ApiPhone }, { name_recorded: true });
             return res.send(`say=t-נרשמתם בהצלחה&go_to=${BASE_URL}?action=main`);
         }
@@ -144,7 +149,7 @@ app.get("/ivr-api", async (req, res) => {
             if (t === "driver") {
                 return res.send(
                     `read=t-הקישו שעת יציאה בארבע ספרות` +
-                    `=digits,4,1,4,7,yes,no&action=set_time&t=${t}&d=${ApiDigits}`
+                    `=digits,4,4,4,7,yes,no&action=set_time&t=${t}&d=${ApiDigits}`
                 );
             }
             return res.send(`go_to=${BASE_URL}?action=finish&t=${t}&d=${ApiDigits}`);
@@ -153,7 +158,7 @@ app.get("/ivr-api", async (req, res) => {
         if (action === "set_time") {
             return res.send(
                 `read=t-מספר מקומות פנויים` +
-                `=digits,1,1,2,7,yes,no&action=finish&t=${t}&d=${d}&tm=${ApiDigits}`
+                `=digits,1,1,1,7,yes,no&action=finish&t=${t}&d=${d}&tm=${ApiDigits}`
             );
         }
 
