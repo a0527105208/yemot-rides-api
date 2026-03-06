@@ -13,186 +13,192 @@ mongoose.connect(mongoURI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 })
-.then(()=>console.log("Mongo connected"))
-.catch(err=>console.log(err));
+.then(() => console.log("Mongo connected"))
+.catch(err => console.error("Mongo connection error:", err));
 
 /* ---------------- Models ---------------- */
 
 const userSchema = new mongoose.Schema({
-    phone: {type:String, required:true, unique:true},
-    name_recorded: {type:Boolean, default:false},
-    createdAt: {type:Date, default:Date.now}
+    phone: { type: String, required: true, unique: true },
+    name_recorded: { type: Boolean, default: false },
+    createdAt: { type: Date, default: Date.now }
 });
 
 const rideSchema = new mongoose.Schema({
-    type: {type:String, enum:["driver","passenger"], required:true},
-    driver_phone: {type:String, required:true},
+    type: { type: String, enum: ["driver", "passenger"], required: true },
+    driver_phone: { type: String, required: true },
     direction: String,
     time: String,
     seats: String,
     note_id: String,
-    createdAt: {type:Date, default:Date.now, expires:10800}
+    createdAt: { type: Date, default: Date.now, expires: 10800 } // נמחק אוטומטית אחרי 3 שעות
 });
 
-const User = mongoose.model("User",userSchema);
-const Ride = mongoose.model("Ride",rideSchema);
+const User = mongoose.model("User", userSchema);
+const Ride = mongoose.model("Ride", rideSchema);
 
-/* ---------------- IVR ---------------- */
+/* ---------------- IVR API ---------------- */
 
-app.get("/ivr-api", async (req,res)=>{
-
+app.get("/ivr-api", async (req, res) => {
     const ApiPhone = req.query.ApiPhone || req.query.phone;
-    const {ApiDigits, action, t, d, tm, s, r_id} = req.query;
+    const { ApiDigits, action, t, d, tm, s, r_id } = req.query;
 
-    console.log("REQ:", req.query);
+    console.log("Incoming Request:", req.query);
 
-    if(!ApiPhone || ApiPhone==="anonymous"){
-        return res.send("say=t-לא ניתן לזהות את מספר הטלפון&goto_all_endpoints=exit");
+    if (!ApiPhone || ApiPhone === "anonymous") {
+        return res.send("say=t-לא ניתן לזהות את מספר הטלפון, אנא וודאו שאינכם מחייגים ממספר חסוי&goto_all_endpoints=exit");
     }
 
-    try{
-
-        let user = await User.findOne({phone: ApiPhone});
-        if(!user){
-            user = await User.create({phone: ApiPhone});
+    try {
+        let user = await User.findOne({ phone: ApiPhone });
+        if (!user) {
+            user = await User.create({ phone: ApiPhone });
         }
 
-        /* ---------- הקלטת שם ---------- */
-        if(!user.name_recorded && action!=="reg"){
-            const recName = `name_${ApiPhone}`;
-
+        /* ---------- שלב הקלטת שם (רישום) ---------- */
+        if (!user.name_recorded && action !== "reg") {
+            // שימוש ב-read מסוג record הוא הכי יציב ב-API
             return res.send(
-                `say=t-שלום! הקליטו את שמכם לאחר הצליל וסיימו בסולמית`+
-                `&record=${recName},1,10,no,no`+
-                `&go_to=${BASE_URL}?action=reg`
+                `read=t-שלום, אינכם רשומים במערכת. הקליטו את שמכם המלא לאחר הצליל וסיימו בסולמית` +
+                `=record,no,1,10,7,yes,no&action=reg`
             );
         }
 
-        if(action==="reg"){
-            await User.updateOne({phone: ApiPhone}, {name_recorded:true});
-            return res.send(`say=t-ההרשמה הושלמה&go_to=${BASE_URL}?action=main`);
+        if (action === "reg") {
+            await User.updateOne({ phone: ApiPhone }, { name_recorded: true });
+            return res.send(`say=t-ההרשמה הושלמה בהצלחה&go_to=${BASE_URL}?action=main`);
         }
 
         /* ---------- תפריט ראשי ---------- */
-        if(!action || action==="main"){
+        if (!action || action === "main") {
             return res.send(
-                `read=t-לנהגים הקישו 1 לנוסעים הקישו 2 למחיקת פרסומים הקישו 3`+
+                `read=t-לנהגים הקישו 1, לנוסעים הקישו 2, למחיקת הפרסומים שלכם הקישו 3` +
                 `=digits,1,1,1,7,yes,no&action=h_main`
             );
         }
 
-        if(action==="h_main"){
-            if(ApiDigits==="1") return res.send(`go_to=${BASE_URL}?action=d_menu`);
-            if(ApiDigits==="2") return res.send(`go_to=${BASE_URL}?action=p_menu`);
-            if(ApiDigits==="3") return res.send(`go_to=${BASE_URL}?action=del`);
+        if (action === "h_main") {
+            if (ApiDigits === "1") return res.send(`go_to=${BASE_URL}?action=d_menu`);
+            if (ApiDigits === "2") return res.send(`go_to=${BASE_URL}?action=p_menu`);
+            if (ApiDigits === "3") return res.send(`go_to=${BASE_URL}?action=del`);
             return res.send(`go_to=${BASE_URL}?action=main`);
         }
 
-        /* ---------- נהג ---------- */
-        if(action==="d_menu"){
+        /* ---------- תפריט נהג ---------- */
+        if (action === "d_menu") {
             return res.send(
-                `read=t-לפרסום נסיעה הקישו 1 לשמיעת בקשות נוסעים הקישו 2`+
+                `read=t-לפרסום נסיעה חדשה הקישו 1, לשמיעת בקשות של נוסעים הקישו 2` +
                 `=digits,1,1,1,7,yes,no&action=h_d`
             );
         }
 
-        if(action==="h_d"){
-            if(ApiDigits==="1") return res.send(`go_to=${BASE_URL}?action=sel_dir&t=driver`);
-            if(ApiDigits==="2") return res.send(`go_to=${BASE_URL}?action=list&list_t=passenger`);
+        if (action === "h_d") {
+            if (ApiDigits === "1") return res.send(`go_to=${BASE_URL}?action=sel_dir&t=driver`);
+            if (ApiDigits === "2") return res.send(`go_to=${BASE_URL}?action=list&list_t=passenger`);
             return res.send(`go_to=${BASE_URL}?action=main`);
         }
 
-        /* ---------- נוסע ---------- */
-        if(action==="p_menu"){
+        /* ---------- תפריט נוסע ---------- */
+        if (action === "p_menu") {
             return res.send(
-                `read=t-לבקשת נסיעה הקישו 1 לשמיעת נהגים הקישו 2`+
+                `read=t-לבקשת נסיעה הקישו 1, לשמיעת נהגים פנויים הקישו 2` +
                 `=digits,1,1,1,7,yes,no&action=h_p`
             );
         }
 
-        if(action==="h_p"){
-            if(ApiDigits==="1") return res.send(`go_to=${BASE_URL}?action=sel_dir&t=passenger`);
-            if(ApiDigits==="2") return res.send(`go_to=${BASE_URL}?action=list&list_t=driver`);
+        if (action === "h_p") {
+            if (ApiDigits === "1") return res.send(`go_to=${BASE_URL}?action=sel_dir&t=passenger`);
+            if (ApiDigits === "2") return res.send(`go_to=${BASE_URL}?action=list&list_t=driver`);
             return res.send(`go_to=${BASE_URL}?action=main`);
         }
 
         /* ---------- בחירת כיוון ---------- */
-        if(action==="sel_dir"){
+        if (action === "sel_dir") {
             return res.send(
-                `read=t-מאשדוד לבני ברק הקישו 1 מבני ברק לאשדוד הקישו 2`+
+                `read=t-מאשדוד לבני ברק הקישו 1, מבני ברק לאשדוד הקישו 2` +
                 `=digits,1,1,1,7,yes,no&action=h_dir&t=${t}`
             );
         }
 
-        if(action==="h_dir"){
-            if(t==="driver"){
+        if (action === "h_dir") {
+            if (t === "driver") {
                 return res.send(
-                    `read=t-הקישו שעת יציאה בארבע ספרות`+
+                    `read=t-הקישו שעת יציאה ב-4 ספרות, לדוגמה 0 8 0 0 לשעה שמונה` +
                     `=digits,4,1,4,7,yes,no&action=set_time&t=${t}&d=${ApiDigits}`
                 );
             }
+            // נוסע לא חייב שעה כרגע (אפשר להוסיף בעתיד)
             return res.send(`go_to=${BASE_URL}?action=finish&t=${t}&d=${ApiDigits}`);
         }
 
-        if(action==="set_time"){
+        if (action === "set_time") {
             return res.send(
-                `read=t-הקישו מספר מקומות פנויים`+
+                `read=t-הקישו מספר מקומות פנויים בנסיעה` +
                 `=digits,1,1,2,7,yes,no&action=finish&t=${t}&d=${d}&tm=${ApiDigits}`
             );
         }
 
-        /* ---------- שמירה ---------- */
-        if(action==="finish"){
+        /* ---------- שמירת הנסיעה ---------- */
+        if (action === "finish") {
             await Ride.create({
-                type:t,
-                driver_phone:ApiPhone,
-                direction:d,
-                time:tm,
-                seats:ApiDigits
+                type: t,
+                driver_phone: ApiPhone,
+                direction: d,
+                time: tm || "",
+                seats: ApiDigits || ""
             });
-            return res.send(`say=t-הפרסום נשמר בהצלחה&go_to=${BASE_URL}?action=main`);
+            return res.send(`say=t-הפרסום נשמר בהצלחה והוא יוסר אוטומטית בעוד שלוש שעות&go_to=${BASE_URL}?action=main`);
         }
 
-        /* ---------- רשימה ---------- */
-        if(action==="list"){
+        /* ---------- הצגת רשימה (האחרון שפורסם) ---------- */
+        if (action === "list") {
             const listT = req.query.list_t;
-            const items = await Ride.find({type:listT}).sort({createdAt:-1}).limit(1);
-            if(items.length===0) return res.send(`say=t-אין כרגע פרסומים&go_to=${BASE_URL}?action=main`);
+            const items = await Ride.find({ type: listT }).sort({ createdAt: -1 }).limit(1);
+            
+            if (items.length === 0) {
+                return res.send(`say=t-אין כרגע פרסומים בקטגוריה זו&go_to=${BASE_URL}?action=main`);
+            }
+
             const item = items[0];
-            let msg = "t-פרסום נסיעה. .";
-            if(item.time) msg+=`t-בשעה ${item.time}. .`;
-            if(item.seats) msg+=`t-${item.seats} מקומות פנויים. .`;
-            msg+="t-לחיוג הקישו 0 לחזרה הקישו 2";
+            const dirTxt = item.direction === "1" ? "מאשדוד לבני ברק" : "מבני ברק לאשדוד";
+            
+            let msg = `t-נסיעה ${dirTxt}. .`;
+            if (item.time) msg += `t-בשעה ${item.time}. .`;
+            if (item.seats) msg += `t-עם ${item.seats} מקומות פנויים. .`;
+            msg += "t-לחיוג למפרסם הקישו 0, לשמיעת הפרסום הבא הקישו 1, לחזרה לתפריט הקישו 2";
+            
             return res.send(`read=${msg}=digits,1,1,1,7,yes,no&action=list_opt&r_id=${item._id}`);
         }
 
-        if(action==="list_opt"){
-            if(ApiDigits==="0"){
+        if (action === "list_opt") {
+            if (ApiDigits === "0") {
                 const ride = await Ride.findById(r_id);
-                if(ride) return res.send(`dial=${ride.driver_phone}`);
+                if (ride) {
+                    return res.send(`api_link=dial&phone=${ride.driver_phone}`);
+                }
             }
+            // כאן אפשר להוסיף לוגיקה של "דפדוף" אם תרצה (דילוג על ה-ID הנוכחי)
             return res.send(`go_to=${BASE_URL}?action=main`);
         }
 
-        /* ---------- מחיקה ---------- */
-        if(action==="del"){
-            const count = await Ride.countDocuments({driver_phone:ApiPhone});
-            if(count===0) return res.send(`say=t-אין לכם פרסומים פעילים&go_to=${BASE_URL}?action=main`);
-            return res.send(`read=t-נמצאו ${count} פרסומים למחיקה הקישו 7=digits,1,1,1,7,yes,no&action=del_ok`);
+        /* ---------- מחיקת פרסומים ---------- */
+        if (action === "del") {
+            const count = await Ride.countDocuments({ driver_phone: ApiPhone });
+            if (count === 0) return res.send(`say=t-אין לכם פרסומים פעילים כרגע&go_to=${BASE_URL}?action=main`);
+            return res.send(`read=t-נמצאו ${count} פרסומים שלכם. למחיקת כולם הקישו 7, לביטול הקישו כל מקש אחר=digits,1,1,1,7,yes,no&action=del_ok`);
         }
 
-        if(action==="del_ok" && ApiDigits==="7"){
-            await Ride.deleteMany({driver_phone:ApiPhone});
-            return res.send(`say=t-הפרסומים נמחקו&go_to=${BASE_URL}?action=main`);
+        if (action === "del_ok" && ApiDigits === "7") {
+            await Ride.deleteMany({ driver_phone: ApiPhone });
+            return res.send(`say=t-כל הפרסומים שלכם נמחקו בהצלחה&go_to=${BASE_URL}?action=main`);
         }
 
         return res.send(`go_to=${BASE_URL}?action=main`);
 
-    }catch(err){
-        console.log(err);
-        return res.send(`say=t-תקלה זמנית במערכת&goto_all_endpoints=exit`);
+    } catch (err) {
+        console.error("Critical Error:", err);
+        return res.send(`say=t-מצטערים, חלה תקלה זמנית במערכת&goto_all_endpoints=exit`);
     }
-
 });
 
-app.listen(port, ()=>{ console.log("Server running on port", port); });
+app.listen(port, () => { console.log("Server running on port", port); });
