@@ -7,16 +7,16 @@ const port = process.env.PORT || 3000;
 const BASE_URL = "https://yemot-rides.onrender.com/ivr-api";
 const mongoURI = process.env.MONGO_URI;
 
-/* -------------------- MongoDB -------------------- */
+/* ---------------- MongoDB ---------------- */
 
 mongoose.connect(mongoURI, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 })
-.then(()=>console.log("MongoDB connected"))
-.catch(err=>console.error("MongoDB error:",err));
+.then(()=>console.log("Mongo connected"))
+.catch(err=>console.log(err));
 
-/* -------------------- Models -------------------- */
+/* ---------------- Models ---------------- */
 
 const userSchema = new mongoose.Schema({
     phone: {type:String, required:true, unique:true},
@@ -37,13 +37,13 @@ const rideSchema = new mongoose.Schema({
 const User = mongoose.model("User",userSchema);
 const Ride = mongoose.model("Ride",rideSchema);
 
-/* -------------------- Health check -------------------- */
+/* ---------------- Health check ---------------- */
 
 app.get("/",(req,res)=>{
-    res.send("Server Alive");
+    res.send("server alive");
 });
 
-/* -------------------- IVR API -------------------- */
+/* ---------------- IVR ---------------- */
 
 app.get("/ivr-api", async (req,res)=>{
 
@@ -53,7 +53,7 @@ app.get("/ivr-api", async (req,res)=>{
     console.log("REQ:",req.query);
 
     if(!ApiPhone || ApiPhone==="anonymous"){
-        return res.send("say=t-לא ניתן לזהות את מספר הטלפון&goto_all_endpoints=exit");
+        return res.send("say=t-לא ניתן לזהות את מספר הטלפון שלכם&goto_all_endpoints=exit");
     }
 
     try{
@@ -66,45 +66,50 @@ app.get("/ivr-api", async (req,res)=>{
 
         /* ---------- רישום משתמש ---------- */
 
-if (!user.name_recorded && action !== "reg") {
+        if(!user.name_recorded && action!=="reg"){
 
-    const recName = `name_${ApiPhone}_${Date.now()}`;
+            const recName = `name_${ApiPhone}`;
 
-    return res.send(
-        `say=t-שלום משתמש חדש אנא הקליטו את שמכם לאחר הצליל וסיימו בסולמית` +
-        `&record=${recName},1,10,no,no` +
-        `&go_to=${BASE_URL}?action=reg&rec=${recName}`
-    );
-}
+            return res.send(
+                `say=t-שלום משתמש חדש אנא הקליטו את שמכם לאחר הצליל וסיימו בסולמית`+
+                `&record=${recName},1,10,no,no`+
+                `&go_to=${BASE_URL}?action=reg`
+            );
+        }
 
-if (action === "reg") {
+        if(action==="reg"){
 
-    await User.updateOne(
-        { phone: ApiPhone },
-        { name_recorded: true }
-    );
+            await User.updateOne(
+                {phone:ApiPhone},
+                {name_recorded:true}
+            );
 
-    return res.send(
-        `say=t-ההרשמה הושלמה בהצלחה` +
-        `&go_to=${BASE_URL}?action=main`
-    );
-}
+            return res.send(
+                `say=t-ההרשמה הושלמה בהצלחה`+
+                `&go_to=${BASE_URL}?action=main`
+            );
+        }
 
         /* ---------- תפריט ראשי ---------- */
 
         if(!action || action==="main"){
 
             return res.send(
-            `read=t-לנהגים הקישו 1 לנוסעים הקישו 2 למחיקה הקישו 3`+
-            `=digits,1,1,1,7,yes,no&action=h_main`
+                `read=t-לנהגים הקישו 1 לנוסעים הקישו 2 למחיקת פרסומים הקישו 3`+
+                `=digits,1,1,1,7,yes,no&action=h_main`
             );
         }
 
         if(action==="h_main"){
 
-            if(ApiDigits==="1") return res.send(`go_to=${BASE_URL}?action=d_menu`);
-            if(ApiDigits==="2") return res.send(`go_to=${BASE_URL}?action=p_menu`);
-            if(ApiDigits==="3") return res.send(`go_to=${BASE_URL}?action=del`);
+            if(ApiDigits==="1")
+                return res.send(`go_to=${BASE_URL}?action=d_menu`);
+
+            if(ApiDigits==="2")
+                return res.send(`go_to=${BASE_URL}?action=p_menu`);
+
+            if(ApiDigits==="3")
+                return res.send(`go_to=${BASE_URL}?action=del`);
 
             return res.send(`go_to=${BASE_URL}?action=main`);
         }
@@ -114,15 +119,18 @@ if (action === "reg") {
         if(action==="d_menu"){
 
             return res.send(
-            `read=t-לפרסום נסיעה הקישו 1 לשמיעת נוסעים הקישו 2`+
-            `=digits,1,1,1,7,yes,no&action=h_d`
+                `read=t-לפרסום נסיעה הקישו 1 לשמיעת בקשות נוסעים הקישו 2`+
+                `=digits,1,1,1,7,yes,no&action=h_d`
             );
         }
 
         if(action==="h_d"){
 
-            if(ApiDigits==="1") return res.send(`go_to=${BASE_URL}?action=sel_dir&t=driver`);
-            if(ApiDigits==="2") return res.send(`go_to=${BASE_URL}?action=list&list_t=passenger`);
+            if(ApiDigits==="1")
+                return res.send(`go_to=${BASE_URL}?action=sel_dir&t=driver`);
+
+            if(ApiDigits==="2")
+                return res.send(`go_to=${BASE_URL}?action=list&list_t=passenger`);
 
             return res.send(`go_to=${BASE_URL}?action=main`);
         }
@@ -132,48 +140,52 @@ if (action === "reg") {
         if(action==="p_menu"){
 
             return res.send(
-            `read=t-לבקשת נסיעה הקישו 1 לשמיעת נהגים הקישו 2`+
-            `=digits,1,1,1,7,yes,no&action=h_p`
+                `read=t-לבקשת נסיעה הקישו 1 לשמיעת נהגים הקישו 2`+
+                `=digits,1,1,1,7,yes,no&action=h_p`
             );
         }
 
         if(action==="h_p"){
 
-            if(ApiDigits==="1") return res.send(`go_to=${BASE_URL}?action=sel_dir&t=passenger`);
-            if(ApiDigits==="2") return res.send(`go_to=${BASE_URL}?action=list&list_t=driver`);
+            if(ApiDigits==="1")
+                return res.send(`go_to=${BASE_URL}?action=sel_dir&t=passenger`);
+
+            if(ApiDigits==="2")
+                return res.send(`go_to=${BASE_URL}?action=list&list_t=driver`);
 
             return res.send(`go_to=${BASE_URL}?action=main`);
         }
 
-        /* ---------- כיוון ---------- */
+        /* ---------- בחירת כיוון ---------- */
 
         if(action==="sel_dir"){
 
             return res.send(
-            `read=t-כיוון אחד הקישו 1 כיוון שני הקישו 2`+
-            `=digits,1,1,1,7,yes,no&action=h_dir&t=${t}`
+                `read=t-מאשדוד לבני ברק הקישו 1 מבני ברק לאשדוד הקישו 2`+
+                `=digits,1,1,1,7,yes,no&action=h_dir&t=${t}`
             );
         }
 
         if(action==="h_dir"){
 
             if(t==="driver"){
+
                 return res.send(
-                `read=t-הקישו שעת יציאה בארבע ספרות`+
-                `=digits,4,1,4,7,yes,no&action=set_time&t=${t}&d=${ApiDigits}`
+                    `read=t-הקישו שעת יציאה בארבע ספרות`+
+                    `=digits,4,1,4,7,yes,no&action=set_time&t=${t}&d=${ApiDigits}`
                 );
             }
 
             return res.send(
-            `go_to=${BASE_URL}?action=finish&t=${t}&d=${ApiDigits}`
+                `go_to=${BASE_URL}?action=finish&t=${t}&d=${ApiDigits}`
             );
         }
 
         if(action==="set_time"){
 
             return res.send(
-            `read=t-הקישו מספר מקומות`+
-            `=digits,1,1,2,7,yes,no&action=finish&t=${t}&d=${d}&tm=${ApiDigits}`
+                `read=t-הקישו מספר מקומות פנויים`+
+                `=digits,1,1,2,7,yes,no&action=finish&t=${t}&d=${d}&tm=${ApiDigits}`
             );
         }
 
@@ -190,57 +202,55 @@ if (action === "reg") {
             });
 
             return res.send(
-            `say=t-הפרסום נשמר`+
-            `&go_to=${BASE_URL}?action=main`
+                `say=t-הפרסום נשמר בהצלחה`+
+                `&go_to=${BASE_URL}?action=main`
             );
         }
 
-        /* ---------- רשימת פרסומים ---------- */
+        /* ---------- רשימה ---------- */
 
         if(action==="list"){
 
             const listT = req.query.list_t;
-            const page = parseInt(index)||0;
-
             const items = await Ride.find({type:listT})
             .sort({createdAt:-1})
-            .skip(page)
             .limit(1);
 
             if(items.length===0){
-                return res.send(`say=t-אין פרסומים נוספים&go_to=${BASE_URL}?action=main`);
+
+                return res.send(
+                    `say=t-אין כרגע פרסומים`+
+                    `&go_to=${BASE_URL}?action=main`
+                );
             }
 
             const item = items[0];
 
             let msg="t-פרסום נסיעה. .";
 
-            if(item.time) msg+=`t-בשעה ${item.time}. .`;
-            if(item.seats) msg+=`t-${item.seats} מקומות פנויים. .`;
+            if(item.time)
+                msg+=`t-בשעה ${item.time}. .`;
 
-            msg+="t-לחיוג הקישו 0 לפרסום הבא הקישו 1 לחזרה הקישו 2";
+            if(item.seats)
+                msg+=`t-${item.seats} מקומות פנויים. .`;
+
+            msg+="t-לחיוג הקישו 0 לחזרה הקישו 2";
 
             return res.send(
-            `read=${msg}`+
-            `=digits,1,1,1,7,yes,no`+
-            `&action=list_opt`+
-            `&r_id=${item._id}`+
-            `&index=${page}`
+                `read=${msg}`+
+                `=digits,1,1,1,7,yes,no&action=list_opt&r_id=${item._id}`
             );
         }
 
         if(action==="list_opt"){
 
-            const page = parseInt(index)||0;
-
             if(ApiDigits==="0"){
 
                 const ride = await Ride.findById(r_id);
-                if(ride) return res.send(`dial=${ride.driver_phone}`);
-            }
 
-            if(ApiDigits==="1"){
-                return res.send(`go_to=${BASE_URL}?action=list&index=${page+1}`);
+                if(ride){
+                    return res.send(`dial=${ride.driver_phone}`);
+                }
             }
 
             return res.send(`go_to=${BASE_URL}?action=main`);
@@ -253,12 +263,16 @@ if (action === "reg") {
             const count = await Ride.countDocuments({driver_phone:ApiPhone});
 
             if(count===0){
-                return res.send(`say=t-אין פרסומים למחיקה&go_to=${BASE_URL}?action=main`);
+
+                return res.send(
+                    `say=t-אין לכם פרסומים פעילים`+
+                    `&go_to=${BASE_URL}?action=main`
+                );
             }
 
             return res.send(
-            `read=t-יש ${count} פרסומים למחיקה הקישו 7`+
-            `=digits,1,1,1,7,yes,no&action=del_ok`
+                `read=t-נמצאו ${count} פרסומים למחיקה הקישו 7`+
+                `=digits,1,1,1,7,yes,no&action=del_ok`
             );
         }
 
@@ -267,8 +281,8 @@ if (action === "reg") {
             await Ride.deleteMany({driver_phone:ApiPhone});
 
             return res.send(
-            `say=t-הפרסומים נמחקו`+
-            `&go_to=${BASE_URL}?action=main`
+                `say=t-הפרסומים נמחקו`+
+                `&go_to=${BASE_URL}?action=main`
             );
         }
 
@@ -276,11 +290,11 @@ if (action === "reg") {
 
     }catch(err){
 
-        console.error("ERROR:",err);
+        console.log(err);
 
         return res.send(
-        `say=t-תקלה זמנית במערכת`+
-        `&goto_all_endpoints=exit`
+            `say=t-תקלה זמנית במערכת`+
+            `&goto_all_endpoints=exit`
         );
     }
 
@@ -289,4 +303,3 @@ if (action === "reg") {
 app.listen(port,()=>{
     console.log("Server running on port",port);
 });
-
