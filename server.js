@@ -42,13 +42,14 @@ const Ride = mongoose.model("Ride", rideSchema);
 /* ---------------- IVR API ---------------- */
 
 app.get("/ivr-api", async (req, res) => {
+    // הגדרת Header קריטי
     res.set('Content-Type', 'text/plain; charset=utf-8');
 
     const ApiPhone = req.query.ApiPhone || req.query.phone;
     const ApiDigits = req.query.ApiDigits;
     const action = req.query.action;
     
-    // בדיקת חיבור מהירה (כוכבית)
+    // בדיקת חיבור מהירה (כוכבית) - בימות המשיח זה מגיע כ-* או s
     if (ApiDigits === "*" || ApiDigits === "s") {
         return res.send("say=t-חיבור השרת תקין&goto_all_endpoints=exit");
     }
@@ -68,10 +69,10 @@ app.get("/ivr-api", async (req, res) => {
         /* ---------- כניסה ראשונית ---------- */
         if (!action) {
             if (!user.name_recorded) {
-                // שימוש בפורמט הקלטה נקי למניעת שגיאות "מינימום ספרות"
+                // שינוי מבנה ההקלטה למבנה שמרני יותר למניעת ניתוקים
                 return res.send(
                     `say=t-שלום אינכם רשומים הקליטו שם מלא ובסיום הקישו סולמית&` +
-                    `record=action=reg,no,7,yes,no`
+                    `record=reg,no,7,yes,no`
                 );
             } else {
                 return res.send(
@@ -83,6 +84,7 @@ app.get("/ivr-api", async (req, res) => {
         /* ---------- רישום (אחרי הקלטה) ---------- */
         if (action === "reg") {
             await User.updateOne({ phone: ApiPhone }, { name_recorded: true });
+            // הוספת השהייה קלה לפני המעבר לתפריט הראשי
             return res.send(`say=t-נרשמתם בהצלחה&go_to=${BASE_URL}?action=main`);
         }
 
