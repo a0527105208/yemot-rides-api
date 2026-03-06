@@ -38,9 +38,8 @@ app.get('/ivr-api', async (req, res) => {
 
     const { ApiPhone, ApiDigits, action, r_id, t, d, tm, s } = req.query;
 
-    // אם אין מספר טלפון, נשמיע הודעה ונתנתק כדי שתדע שהפרמטר חסר
     if (!ApiPhone) {
-        return res.send('say=t-שגיאה חסר מספר טלפון במערכת בדקו הגדרות שלוחה&goto_all_endpoints=exit');
+        return res.send('say=t-שגיאה חסר מספר טלפון&goto_all_endpoints=exit');
     }
 
     try {
@@ -49,16 +48,16 @@ app.get('/ivr-api', async (req, res) => {
             user = await User.create({ phone: ApiPhone, name_recorded: false });
         }
 
-        // שלב הקלטת שם - תיקון הפקודה
+        // --- תיקון שלב ההקלטה ---
+        // אם המשתמש לא רשום, נשלח אותו להקלטה כשלב נפרד לחלוטין
         if (!user.name_recorded && action !== 'reg') {
-            // בימות המשיח, בתוך שלוחת API, פקודת הקלטת שם צריכה להסתיים ולחזור לשרת
-            return res.send(`read=t-שלום אינך רשום במערכת אנא הקליטו את שמכם המלא לאחר הצליל וסיימו בסולמית=record_name,no,1,1,7,yes,no&action=reg`);
+            // בימות המשיח ב-API: פקודת record_name עומדת בפני עצמה או בסוף מחרוזת
+            return res.send(`say=t-שלום אינך רשום במערכת אנא הקליטו את שמכם המלא לאחר הצליל וסיימו בסולמית&record_name=no,1,1,7,yes,no&action=reg`);
         }
         
         if (action === 'reg') {
-            // אם המשתמש סיים להקליט (לחץ סולמית או עבר זמן), המערכת חוזרת לכאן
             await User.updateOne({ phone: ApiPhone }, { name_recorded: true });
-            return res.send(`say=t-השם נשמר בהצלחה&go_to=${BASE_URL}?action=main`);
+            return res.send(`say=t-השם נשמר&go_to=${BASE_URL}?action=main`);
         }
 
         // Main Menu
@@ -115,11 +114,11 @@ app.get('/ivr-api', async (req, res) => {
             return res.send(`read=t-להקלטת הערה הקישו 1 או סולמית=digits,1,1,1,7,yes,no&action=n_st&t=driver&d=${d}&tm=${tm}&s=${seatsVal}`);
         }
 
-        // הקלטת הערה - תיקון דומה
+        // --- תיקון הקלטת הערה ---
         if (action === 'n_st') {
             if (ApiDigits === '1') {
                 const noteName = `n_${Date.now()}`;
-                return res.send(`read=t-הקליטו הערה וסיימו בסולמית=record_name,no,1,1,7,yes,no&action=fin&t=${t}&d=${d}&tm=${tm || ''}&s=${s || ''}&n_id=${noteName}`);
+                return res.send(`say=t-הקליטו הערה וסיימו בסולמית&record_name=no,1,1,7,yes,no&action=fin&t=${t}&d=${d}&tm=${tm || ''}&s=${s || ''}&n_id=${noteName}`);
             }
             return res.send(`go_to=${BASE_URL}?action=fin&t=${t}&d=${d}&tm=${tm || ''}&s=${s || ''}`);
         }
@@ -181,7 +180,7 @@ app.get('/ivr-api', async (req, res) => {
 
     } catch (error) {
         console.error("Critical Error:", error);
-        res.send(`say=t-תקלה בשרת הודעה ${error.message.replace(/[^א-תa-zA-Z0-9 ]/g, '')}&goto_all_endpoints=exit`);
+        res.send(`say=t-תקלה בשרת&goto_all_endpoints=exit`);
     }
 });
 
