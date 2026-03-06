@@ -45,32 +45,40 @@ app.get("/ivr-api", async (req, res) => {
 
     console.log("Incoming Request:", req.query);
 
+    // בדיקת זיהוי טלפון
     if (!ApiPhone || ApiPhone === "anonymous") {
         return res.send("say=t-לא ניתן לזהות את מספר הטלפון, אנא וודאו שאינכם מחייגים ממספר חסוי&goto_all_endpoints=exit");
     }
 
     try {
         let user = await User.findOne({ phone: ApiPhone });
+        
+        // יצירת משתמש אם לא קיים
         if (!user) {
             user = await User.create({ phone: ApiPhone });
         }
 
-        /* ---------- שלב הקלטת שם (רישום) ---------- */
-        if (!user.name_recorded && action !== "reg") {
-            // שימוש ב-read מסוג record הוא הכי יציב ב-API
-            return res.send(
-                `read=t-שלום, אינכם רשומים במערכת. הקליטו את שמכם המלא לאחר הצליל וסיימו בסולמית` +
-                `=record,no,1,10,7,yes,no&action=reg`
-            );
+        /* ---------- טיפול במקרה של כניסה ראשונית (ללא action) ---------- */
+        if (!action) {
+            if (!user.name_recorded) {
+                return res.send(
+                    `read=t-שלום, ברוכים הבאים למערכת הטרמפים. אינכם רשומים במערכת. הקליטו את שמכם המלא לאחר הצליל וסיימו בסולמית` +
+                    `=record,no,1,10,7,yes,no&action=reg`
+                );
+            } else {
+                // אם כבר רשום, העבר לתפריט ראשי
+                return res.send(`go_to=${BASE_URL}?action=main`);
+            }
         }
 
+        /* ---------- רישום שם ---------- */
         if (action === "reg") {
             await User.updateOne({ phone: ApiPhone }, { name_recorded: true });
             return res.send(`say=t-ההרשמה הושלמה בהצלחה&go_to=${BASE_URL}?action=main`);
         }
 
         /* ---------- תפריט ראשי ---------- */
-        if (!action || action === "main") {
+        if (action === "main") {
             return res.send(
                 `read=t-לנהגים הקישו 1, לנוסעים הקישו 2, למחיקת הפרסומים שלכם הקישו 3` +
                 `=digits,1,1,1,7,yes,no&action=h_main`
@@ -127,7 +135,6 @@ app.get("/ivr-api", async (req, res) => {
                     `=digits,4,1,4,7,yes,no&action=set_time&t=${t}&d=${ApiDigits}`
                 );
             }
-            // נוסע לא חייב שעה כרגע (אפשר להוסיף בעתיד)
             return res.send(`go_to=${BASE_URL}?action=finish&t=${t}&d=${ApiDigits}`);
         }
 
@@ -150,7 +157,7 @@ app.get("/ivr-api", async (req, res) => {
             return res.send(`say=t-הפרסום נשמר בהצלחה והוא יוסר אוטומטית בעוד שלוש שעות&go_to=${BASE_URL}?action=main`);
         }
 
-        /* ---------- הצגת רשימה (האחרון שפורסם) ---------- */
+        /* ---------- הצגת רשימה ---------- */
         if (action === "list") {
             const listT = req.query.list_t;
             const items = await Ride.find({ type: listT }).sort({ createdAt: -1 }).limit(1);
@@ -177,7 +184,6 @@ app.get("/ivr-api", async (req, res) => {
                     return res.send(`api_link=dial&phone=${ride.driver_phone}`);
                 }
             }
-            // כאן אפשר להוסיף לוגיקה של "דפדוף" אם תרצה (דילוג על ה-ID הנוכחי)
             return res.send(`go_to=${BASE_URL}?action=main`);
         }
 
