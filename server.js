@@ -66,27 +66,29 @@ app.get("/ivr-api", async (req,res)=>{
 
         /* ---------- רישום משתמש ---------- */
 
-        if(!user.name_recorded && action!=="reg"){
+if (!user.name_recorded && action !== "reg") {
 
-            return res.send(
-            `say=t-שלום משתמש חדש הקליטו את שמכם לאחר הצליל`+
-            `&record=name_${ApiPhone},1,7,yes,no`+
-            `&action=reg`
-            );
-        }
+    const recName = `name_${ApiPhone}_${Date.now()}`;
 
-        if(action==="reg"){
+    return res.send(
+        `say=t-שלום משתמש חדש אנא הקליטו את שמכם לאחר הצליל וסיימו בסולמית` +
+        `&record=${recName},1,10,no,no` +
+        `&go_to=${BASE_URL}?action=reg&rec=${recName}`
+    );
+}
 
-            await User.updateOne(
-                {phone:ApiPhone},
-                {name_recorded:true}
-            );
+if (action === "reg") {
 
-            return res.send(
-            `say=t-ההרשמה הושלמה בהצלחה`+
-            `&go_to=${BASE_URL}?action=main`
-            );
-        }
+    await User.updateOne(
+        { phone: ApiPhone },
+        { name_recorded: true }
+    );
+
+    return res.send(
+        `say=t-ההרשמה הושלמה בהצלחה` +
+        `&go_to=${BASE_URL}?action=main`
+    );
+}
 
         /* ---------- תפריט ראשי ---------- */
 
@@ -287,3 +289,4 @@ app.get("/ivr-api", async (req,res)=>{
 app.listen(port,()=>{
     console.log("Server running on port",port);
 });
+
